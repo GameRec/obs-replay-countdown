@@ -33,13 +33,13 @@
     },
     "platformConfig": {
         "macos": {
-            "bundleId": "com.example.plugintemplate-for-obs"
+            "bundleId": "org.gamerec.obs-replay-countdown"
         }
     },
-    "name": "plugintemplate-for-obs",
-    "displayName": "Plugin Template for OBS",
+    "name": "obs-replay-countdown",
+    "displayName": "Replay Countdown",
     "version": "1.0.0",
-    "author": "Your Name Here",
-    "website": "https://example.com",
-    "email": "me@example.com"
+    "author": "Damian Strojny (trx)",
+    "website": "https://gamerec.org",
+    "email": "trx@gamerec.org"
 }
