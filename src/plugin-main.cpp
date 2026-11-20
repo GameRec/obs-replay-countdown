@@ -3,8 +3,6 @@
 #include <util/config-file.h>
 #include <util/platform.h>
 #include "plugin-support.h"
-
-#include <QApplication>
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFrame>
