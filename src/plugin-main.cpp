@@ -16,7 +16,6 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
-
 #include <algorithm>
 
 OBS_DECLARE_MODULE()
@@ -38,7 +37,7 @@ static int get_obs_replay_buffer_seconds()
 	const char *mode = config_get_string(cfg, "Output", "Mode");
 	int seconds = 0;
 
-	if (mode && astrcmpi(mode, "Advanced") == 0) {
+	if (mode && QString::compare(QString::fromUtf8(mode), "Advanced", Qt::CaseInsensitive) == 0) {
 		seconds = (int)config_get_int(cfg, "AdvOut", "RecRBTime");
 	} else {
 		seconds = (int)config_get_int(cfg, "SimpleOutput", "RecRBTime");
@@ -378,26 +377,26 @@ private:
 
 	void saveSettings()
 	{
-		config_t *globalCfg = obs_frontend_get_global_config();
-		if (!globalCfg)
+		config_t *appCfg = obs_frontend_get_app_config();
+		if (!appCfg)
 			return;
-		config_set_int(globalCfg, "ReplayCountdown", "OffsetSec", offsetSpin->value());
-		config_set_int(globalCfg, "ReplayCountdown", "CornerIndex", cornerCombo->currentIndex());
-		config_set_int(globalCfg, "ReplayCountdown", "ScalePercent", scaleSpin->value());
-		config_save_safe(globalCfg, "tmp", nullptr);
+		config_set_int(appCfg, "ReplayCountdown", "OffsetSec", offsetSpin->value());
+		config_set_int(appCfg, "ReplayCountdown", "CornerIndex", cornerCombo->currentIndex());
+		config_set_int(appCfg, "ReplayCountdown", "ScalePercent", scaleSpin->value());
+		config_save_safe(appCfg, "tmp", nullptr);
 	}
 
 	void loadSettings()
 	{
-		config_t *globalCfg = obs_frontend_get_global_config();
-		if (!globalCfg)
+		config_t *appCfg = obs_frontend_get_app_config();
+		if (!appCfg)
 			return;
-		if (config_has_user_value(globalCfg, "ReplayCountdown", "OffsetSec"))
-			offsetSpin->setValue((int)config_get_int(globalCfg, "ReplayCountdown", "OffsetSec"));
-		if (config_has_user_value(globalCfg, "ReplayCountdown", "CornerIndex"))
-			cornerCombo->setCurrentIndex((int)config_get_int(globalCfg, "ReplayCountdown", "CornerIndex"));
-		if (config_has_user_value(globalCfg, "ReplayCountdown", "ScalePercent"))
-			scaleSpin->setValue((int)config_get_int(globalCfg, "ReplayCountdown", "ScalePercent"));
+		if (config_has_user_value(appCfg, "ReplayCountdown", "OffsetSec"))
+			offsetSpin->setValue((int)config_get_int(appCfg, "ReplayCountdown", "OffsetSec"));
+		if (config_has_user_value(appCfg, "ReplayCountdown", "CornerIndex"))
+			cornerCombo->setCurrentIndex((int)config_get_int(appCfg, "ReplayCountdown", "CornerIndex"));
+		if (config_has_user_value(appCfg, "ReplayCountdown", "ScalePercent"))
+			scaleSpin->setValue((int)config_get_int(appCfg, "ReplayCountdown", "ScalePercent"));
 	}
 };
 
