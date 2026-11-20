@@ -3,6 +3,17 @@
 #include <util/config-file.h>
 #include <util/platform.h>
 #include "plugin-support.h"
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#ifndef WDA_EXCLUDEFROMCAPTURE
+#define WDA_EXCLUDEFROMCAPTURE 0x00000011
+#endif
+#endif
+
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFrame>
@@ -16,6 +27,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
+
 #include <algorithm>
 
 OBS_DECLARE_MODULE()
@@ -46,7 +58,7 @@ static int get_obs_replay_buffer_seconds()
 	return (seconds > 0) ? seconds : 150;
 }
 
-// Przezroczyste okno nakladki (click-through) wyswietlajace stoper na ekranie
+// Przezroczyste okno nakladki (click-through + ukryte przed przechwytywaniem ekranu)
 class CountdownOverlay : public QWidget {
 public:
 	CountdownOverlay() : QWidget(nullptr)
@@ -71,10 +83,21 @@ public:
 		layout->addWidget(timeLabel);
 
 		applyVisualStyle("#00E676", 100);
+		applyCaptureExclusion();
 		hide();
 	}
 
-	void updateDisplay(int remainingSec, CountdownMode mode, int scalePercent, int cornerIndex)
+	void applyCaptureExclusion()
+	{
+#ifdef _WIN32
+		HWND hwnd = reinterpret_cast<HWND>(winId());
+		if (hwnd) {
+			SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+		}
+#endif
+	}
+
+	void updateDisplay(int remainingSec, CountdownMode mode, int scalePercent, int screenIndex, int cornerIndex)
 	{
 		int mins = std::max(0, remainingSec) / 60;
 		int secs = std::max(0, remainingSec) % 60;
@@ -99,7 +122,15 @@ public:
 
 		applyVisualStyle(accentColor, scalePercent);
 		adjustSize();
-		repositionToCorner(cornerIndex);
+		repositionToScreenAndCorner(screenIndex, cornerIndex);
+		applyCaptureExclusion();
+	}
+
+protected:
+	void showEvent(QShowEvent *event) override
+	{
+		QWidget::showEvent(event);
+		applyCaptureExclusion();
 	}
 
 private:
@@ -134,9 +165,17 @@ private:
 						 .arg(timePt));
 	}
 
-	void repositionToCorner(int cornerIndex)
+	void repositionToScreenAndCorner(int screenIndex, int cornerIndex)
 	{
-		QScreen *screen = QGuiApplication::primaryScreen();
+		const auto screens = QGuiApplication::screens();
+		QScreen *screen = nullptr;
+
+		if (screenIndex >= 0 && screenIndex < screens.size()) {
+			screen = screens.at(screenIndex);
+		} else {
+			screen = QGuiApplication::primaryScreen();
+		}
+
 		if (!screen)
 			return;
 
@@ -179,6 +218,7 @@ public:
 		connect(timer, &QTimer::timeout, this, &ReplayCountdownController::onTick);
 
 		buildDockUi();
+		populateScreens();
 		loadSettings();
 		refreshBufferInfo();
 	}
@@ -202,7 +242,6 @@ public:
 			return;
 		}
 
-		// Najpierw zapisz biezaca powtorke
 		obs_frontend_replay_buffer_save();
 
 		int rbTotal = get_obs_replay_buffer_seconds();
@@ -240,7 +279,6 @@ public:
 
 	void onReplaySavedExternally()
 	{
-		// Jesli uzytkownik kliknal zwykly zapis w trybie ActionWindow, chowamy licznik
 		if (activeMode == CountdownMode::ActionWindow) {
 			stopCountdown("Status: Replay saved! Timer cleared.");
 		}
@@ -264,6 +302,7 @@ private:
 	QLabel *bufferInfoLabel = nullptr;
 	QLabel *statusLabel = nullptr;
 	QSpinBox *offsetSpin = nullptr;
+	QComboBox *screenCombo = nullptr;
 	QComboBox *cornerCombo = nullptr;
 	QSpinBox *scaleSpin = nullptr;
 
@@ -286,12 +325,19 @@ private:
 		offsetRow->addWidget(offsetSpin);
 		root->addLayout(offsetRow);
 
+		// Wybor monitora
+		auto *screenRow = new QHBoxLayout();
+		screenRow->addWidget(new QLabel("Display monitor:", this));
+		screenCombo = new QComboBox(this);
+		screenRow->addWidget(screenCombo);
+		root->addLayout(screenRow);
+
 		// Pozycja na ekranie
 		auto *cornerRow = new QHBoxLayout();
 		cornerRow->addWidget(new QLabel("Overlay position:", this));
 		cornerCombo = new QComboBox(this);
 		cornerCombo->addItems({"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"});
-		cornerCombo->setCurrentIndex(1); // domyslnie Top-Right
+		cornerCombo->setCurrentIndex(1);
 		cornerRow->addWidget(cornerCombo);
 		root->addLayout(cornerRow);
 
@@ -313,7 +359,7 @@ private:
 		btnRow->addWidget(stopBtn);
 		root->addLayout(btnRow);
 
-		statusLabel = new QLabel("Status: Idle (configure keys in Settings -> Hotkeys)", this);
+		statusLabel = new QLabel("Status: Idle (hidden from capture)", this);
 		statusLabel->setWordWrap(true);
 		root->addWidget(statusLabel);
 
@@ -323,7 +369,7 @@ private:
 			activeMode = CountdownMode::None;
 			remainingSeconds = 10;
 			startOverlayTimer();
-			statusLabel->setText("Status: Testing overlay...");
+			statusLabel->setText("Status: Testing overlay (capture-excluded)...");
 		});
 
 		connect(stopBtn, &QPushButton::clicked, this, [this]() {
@@ -331,25 +377,56 @@ private:
 		});
 
 		connect(offsetSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() { saveSettings(); });
+
+		connect(screenCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
+			saveSettings();
+			refreshLiveOverlay();
+		});
+
 		connect(cornerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
 			saveSettings();
-			if (overlay->isVisible()) {
-				overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
-						       cornerCombo->currentIndex());
-			}
+			refreshLiveOverlay();
 		});
+
 		connect(scaleSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() {
 			saveSettings();
-			if (overlay->isVisible()) {
-				overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
-						       cornerCombo->currentIndex());
-			}
+			refreshLiveOverlay();
 		});
+	}
+
+	void populateScreens()
+	{
+		screenCombo->blockSignals(true);
+		screenCombo->clear();
+		const auto screens = QGuiApplication::screens();
+		for (int i = 0; i < screens.size(); ++i) {
+			QScreen *s = screens.at(i);
+			QRect g = s->geometry();
+			QString label = QString("Monitor %1: %2 (%3x%4)")
+						.arg(i + 1)
+						.arg(s->name())
+						.arg(g.width())
+						.arg(g.height());
+			screenCombo->addItem(label);
+		}
+		if (screenCombo->count() == 0) {
+			screenCombo->addItem("Primary Monitor");
+		}
+		screenCombo->blockSignals(false);
+	}
+
+	void refreshLiveOverlay()
+	{
+		if (overlay && overlay->isVisible()) {
+			overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
+					       screenCombo->currentIndex(), cornerCombo->currentIndex());
+		}
 	}
 
 	void startOverlayTimer()
 	{
-		overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(), cornerCombo->currentIndex());
+		overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
+				       screenCombo->currentIndex(), cornerCombo->currentIndex());
 		overlay->show();
 		timer->start();
 	}
@@ -372,7 +449,8 @@ private:
 			return;
 		}
 
-		overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(), cornerCombo->currentIndex());
+		overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
+				       screenCombo->currentIndex(), cornerCombo->currentIndex());
 	}
 
 	void saveSettings()
@@ -381,6 +459,7 @@ private:
 		if (!appCfg)
 			return;
 		config_set_int(appCfg, "ReplayCountdown", "OffsetSec", offsetSpin->value());
+		config_set_int(appCfg, "ReplayCountdown", "ScreenIndex", screenCombo->currentIndex());
 		config_set_int(appCfg, "ReplayCountdown", "CornerIndex", cornerCombo->currentIndex());
 		config_set_int(appCfg, "ReplayCountdown", "ScalePercent", scaleSpin->value());
 		config_save_safe(appCfg, "tmp", nullptr);
@@ -393,6 +472,11 @@ private:
 			return;
 		if (config_has_user_value(appCfg, "ReplayCountdown", "OffsetSec"))
 			offsetSpin->setValue((int)config_get_int(appCfg, "ReplayCountdown", "OffsetSec"));
+		if (config_has_user_value(appCfg, "ReplayCountdown", "ScreenIndex")) {
+			int idx = (int)config_get_int(appCfg, "ReplayCountdown", "ScreenIndex");
+			if (idx >= 0 && idx < screenCombo->count())
+				screenCombo->setCurrentIndex(idx);
+		}
 		if (config_has_user_value(appCfg, "ReplayCountdown", "CornerIndex"))
 			cornerCombo->setCurrentIndex((int)config_get_int(appCfg, "ReplayCountdown", "CornerIndex"));
 		if (config_has_user_value(appCfg, "ReplayCountdown", "ScalePercent"))

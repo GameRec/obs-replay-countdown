@@ -19,6 +19,10 @@ add_library(${CMAKE_PROJECT_NAME} MODULE)
 find_package(libobs REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::libobs)
 
+if(WIN32)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE user32)
+endif()
+
 if(ENABLE_FRONTEND_API)
   find_package(obs-frontend-api REQUIRED)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
@@ -40,3 +44,12 @@ endif()
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/plugin-main.cpp)
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
+
+# Wymuszenie klasycznej struktury folderow obs-plugins/64bit/ przy pakowaniu na Windows
+if(WIN32)
+  install(
+    TARGETS ${CMAKE_PROJECT_NAME}
+    RUNTIME DESTINATION "obs-plugins/64bit"
+    LIBRARY DESTINATION "obs-plugins/64bit"
+  )
+endif()
