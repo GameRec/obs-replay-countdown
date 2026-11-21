@@ -33,13 +33,17 @@
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
+static inline QString trObs(const char *key)
+{
+	return QString::fromUtf8(obs_module_text(key));
+}
+
 enum class CountdownMode {
 	None = 0,
 	AutoChain = 1,
 	ActionWindow = 2
 };
 
-// Odczyt aktualnej dlugosci bufora powtorki (w sekundach) z ustawien profilu OBS
 static int get_obs_replay_buffer_seconds()
 {
 	config_t *cfg = obs_frontend_get_profile_config();
@@ -58,7 +62,6 @@ static int get_obs_replay_buffer_seconds()
 	return (seconds > 0) ? seconds : 150;
 }
 
-// Przezroczyste okno nakladki (click-through + ukryte przed przechwytywaniem ekranu)
 class CountdownOverlay : public QWidget {
 public:
 	CountdownOverlay() : QWidget(nullptr)
@@ -73,7 +76,7 @@ public:
 		layout->setContentsMargins(16, 10, 16, 10);
 		layout->setSpacing(2);
 
-		modeLabel = new QLabel("REPLAY BUFFER", this);
+		modeLabel = new QLabel(trObs("OverlayTest"), this);
 		modeLabel->setAlignment(Qt::AlignCenter);
 
 		timeLabel = new QLabel("02:30", this);
@@ -106,18 +109,18 @@ public:
 					   .arg(secs, 2, 10, QChar('0')));
 
 		if (mode == CountdownMode::AutoChain) {
-			modeLabel->setText("AUTO-SAVE IN");
+			modeLabel->setText(trObs("OverlayAutoSave"));
 		} else if (mode == CountdownMode::ActionWindow) {
-			modeLabel->setText("BUFFER WINDOW");
+			modeLabel->setText(trObs("OverlayBufferWindow"));
 		} else {
-			modeLabel->setText("TEST OVERLAY");
+			modeLabel->setText(trObs("OverlayTest"));
 		}
 
-		QString accentColor = "#00E676"; // zielony
+		QString accentColor = "#00E676";
 		if (remainingSec <= 5) {
-			accentColor = "#FF1744"; // czerwony
+			accentColor = "#FF1744";
 		} else if (remainingSec <= 20) {
-			accentColor = "#FFEA00"; // zolty
+			accentColor = "#FFEA00";
 		}
 
 		applyVisualStyle(accentColor, scalePercent);
@@ -185,19 +188,19 @@ private:
 		int y = avail.top() + margin;
 
 		switch (cornerIndex) {
-		case 1: // Top-Right
+		case 1:
 			x = avail.right() - width() - margin;
 			y = avail.top() + margin;
 			break;
-		case 2: // Bottom-Left
+		case 2:
 			x = avail.left() + margin;
 			y = avail.bottom() - height() - margin;
 			break;
-		case 3: // Bottom-Right
+		case 3:
 			x = avail.right() - width() - margin;
 			y = avail.bottom() - height() - margin;
 			break;
-		case 0: // Top-Left
+		case 0:
 		default:
 			x = avail.left() + margin;
 			y = avail.top() + margin;
@@ -207,7 +210,6 @@ private:
 	}
 };
 
-// Glowny kontroler wtyczki i dok w OBS
 class ReplayCountdownController : public QWidget {
 public:
 	ReplayCountdownController(QWidget *parent = nullptr) : QWidget(parent)
@@ -238,7 +240,7 @@ public:
 	void triggerAutoChain()
 	{
 		if (!obs_frontend_replay_buffer_active()) {
-			statusLabel->setText("Status: Replay Buffer is OFF!");
+			statusLabel->setText(trObs("StatusBufferOff"));
 			return;
 		}
 
@@ -251,13 +253,13 @@ public:
 		activeMode = CountdownMode::AutoChain;
 		remainingSeconds = target;
 		startOverlayTimer();
-		statusLabel->setText(QString("Status: Auto-Chain active (%1s)").arg(target));
+		statusLabel->setText(trObs("StatusAutoChainActive").arg(target));
 	}
 
 	void triggerActionWindow()
 	{
 		if (!obs_frontend_replay_buffer_active()) {
-			statusLabel->setText("Status: Replay Buffer is OFF!");
+			statusLabel->setText(trObs("StatusBufferOff"));
 			return;
 		}
 
@@ -265,10 +267,10 @@ public:
 		activeMode = CountdownMode::ActionWindow;
 		remainingSeconds = rbTotal;
 		startOverlayTimer();
-		statusLabel->setText(QString("Status: Action Window (%1s)").arg(rbTotal));
+		statusLabel->setText(trObs("StatusActionWindow").arg(rbTotal));
 	}
 
-	void stopCountdown(const QString &reason = "Status: Idle")
+	void stopCountdown(const QString &reason)
 	{
 		timer->stop();
 		activeMode = CountdownMode::None;
@@ -280,7 +282,7 @@ public:
 	void onReplaySavedExternally()
 	{
 		if (activeMode == CountdownMode::ActionWindow) {
-			stopCountdown("Status: Replay saved! Timer cleared.");
+			stopCountdown(trObs("StatusReplaySaved"));
 		}
 	}
 
@@ -288,9 +290,10 @@ public:
 	{
 		int sec = get_obs_replay_buffer_seconds();
 		bool active = obs_frontend_replay_buffer_active();
-		bufferInfoLabel->setText(QString("OBS Buffer: %1s (%2)")
+		bufferInfoLabel->setText(QString("%1: %2s (%3)")
+						 .arg(trObs("ObsBuffer"))
 						 .arg(sec)
-						 .arg(active ? "ACTIVE" : "STOPPED"));
+						 .arg(active ? trObs("StatusActive") : trObs("StatusStopped")));
 	}
 
 private:
@@ -312,38 +315,35 @@ private:
 		root->setContentsMargins(10, 10, 10, 10);
 		root->setSpacing(8);
 
-		bufferInfoLabel = new QLabel("OBS Buffer: --s", this);
+		bufferInfoLabel = new QLabel(QString("%1: --s").arg(trObs("ObsBuffer")), this);
 		bufferInfoLabel->setStyleSheet("font-weight: bold;");
 		root->addWidget(bufferInfoLabel);
 
-		// Margines bezpieczenstwa dla Auto-Chain
 		auto *offsetRow = new QHBoxLayout();
-		offsetRow->addWidget(new QLabel("Auto-Chain safety offset (sec):", this));
+		offsetRow->addWidget(new QLabel(trObs("OffsetLabel"), this));
 		offsetSpin = new QSpinBox(this);
 		offsetSpin->setRange(0, 60);
 		offsetSpin->setValue(5);
 		offsetRow->addWidget(offsetSpin);
 		root->addLayout(offsetRow);
 
-		// Wybor monitora
 		auto *screenRow = new QHBoxLayout();
-		screenRow->addWidget(new QLabel("Display monitor:", this));
+		screenRow->addWidget(new QLabel(trObs("MonitorLabel"), this));
 		screenCombo = new QComboBox(this);
 		screenRow->addWidget(screenCombo);
 		root->addLayout(screenRow);
 
-		// Pozycja na ekranie
 		auto *cornerRow = new QHBoxLayout();
-		cornerRow->addWidget(new QLabel("Overlay position:", this));
+		cornerRow->addWidget(new QLabel(trObs("PositionLabel"), this));
 		cornerCombo = new QComboBox(this);
-		cornerCombo->addItems({"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"});
+		cornerCombo->addItems({trObs("PosTopLeft"), trObs("PosTopRight"),
+				       trObs("PosBottomLeft"), trObs("PosBottomRight")});
 		cornerCombo->setCurrentIndex(1);
 		cornerRow->addWidget(cornerCombo);
 		root->addLayout(cornerRow);
 
-		// Skala licznika
 		auto *scaleRow = new QHBoxLayout();
-		scaleRow->addWidget(new QLabel("Overlay scale (%):", this));
+		scaleRow->addWidget(new QLabel(trObs("ScaleLabel"), this));
 		scaleSpin = new QSpinBox(this);
 		scaleSpin->setRange(60, 200);
 		scaleSpin->setSingleStep(10);
@@ -351,15 +351,14 @@ private:
 		scaleRow->addWidget(scaleSpin);
 		root->addLayout(scaleRow);
 
-		// Przyciski akcji / testu
 		auto *btnRow = new QHBoxLayout();
-		auto *testBtn = new QPushButton("Test Overlay (10s)", this);
-		auto *stopBtn = new QPushButton("Stop / Hide", this);
+		auto *testBtn = new QPushButton(trObs("BtnTest"), this);
+		auto *stopBtn = new QPushButton(trObs("BtnStop"), this);
 		btnRow->addWidget(testBtn);
 		btnRow->addWidget(stopBtn);
 		root->addLayout(btnRow);
 
-		statusLabel = new QLabel("Status: Idle (hidden from capture)", this);
+		statusLabel = new QLabel(trObs("StatusIdle"), this);
 		statusLabel->setWordWrap(true);
 		root->addWidget(statusLabel);
 
@@ -369,11 +368,11 @@ private:
 			activeMode = CountdownMode::None;
 			remainingSeconds = 10;
 			startOverlayTimer();
-			statusLabel->setText("Status: Testing overlay (capture-excluded)...");
+			statusLabel->setText(trObs("StatusTesting"));
 		});
 
 		connect(stopBtn, &QPushButton::clicked, this, [this]() {
-			stopCountdown("Status: Stopped manually.");
+			stopCountdown(trObs("StatusStoppedManual"));
 		});
 
 		connect(offsetSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() { saveSettings(); });
@@ -410,7 +409,7 @@ private:
 			screenCombo->addItem(label);
 		}
 		if (screenCombo->count() == 0) {
-			screenCombo->addItem("Primary Monitor");
+			screenCombo->addItem("Monitor 1");
 		}
 		screenCombo->blockSignals(false);
 	}
@@ -439,12 +438,12 @@ private:
 			if (activeMode == CountdownMode::AutoChain) {
 				if (obs_frontend_replay_buffer_active()) {
 					obs_frontend_replay_buffer_save();
-					stopCountdown("Status: Second replay auto-saved!");
+					stopCountdown(trObs("StatusSecondSaved"));
 				} else {
-					stopCountdown("Status: Buffer stopped before auto-save.");
+					stopCountdown(trObs("StatusBufferStoppedMid"));
 				}
 			} else {
-				stopCountdown("Status: Countdown finished.");
+				stopCountdown(trObs("StatusFinished"));
 			}
 			return;
 		}
@@ -535,7 +534,7 @@ static void on_frontend_event(enum obs_frontend_event event, void *private_data)
 		QMetaObject::invokeMethod(g_controller, []() {
 			if (g_controller) {
 				g_controller->refreshBufferInfo();
-				g_controller->stopCountdown("Status: Replay Buffer stopped.");
+				g_controller->stopCountdown(trObs("StatusBufferStoppedMid"));
 			}
 		}, Qt::QueuedConnection);
 		break;
@@ -581,17 +580,17 @@ bool obs_module_load(void)
 	auto *mainWindow = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	if (mainWindow) {
 		g_controller = new ReplayCountdownController();
-		obs_frontend_add_dock_by_id("obs_replay_countdown_dock", "Replay Countdown", g_controller);
+		obs_frontend_add_dock_by_id("obs_replay_countdown_dock", obs_module_text("DockTitle"), g_controller);
 	}
 
 	g_hotkey_autochain = obs_hotkey_register_frontend(
 		"replay_countdown.autochain",
-		"Replay Countdown: Auto-Chain Save (Save + Countdown)",
+		obs_module_text("HotkeyAutoChain"),
 		hotkey_autochain_cb, nullptr);
 
 	g_hotkey_window = obs_hotkey_register_frontend(
 		"replay_countdown.window",
-		"Replay Countdown: Action Window (Countdown Only)",
+		obs_module_text("HotkeyWindow"),
 		hotkey_window_cb, nullptr);
 
 	obs_frontend_add_event_callback(on_frontend_event, nullptr);

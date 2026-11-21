@@ -45,9 +45,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/plugin-main.cpp)
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
-# Nadpisanie struktury paczki dla Windows: obs-plugins/64bit oraz data/obs-plugins/<nazwa>
 if(WIN32)
-  set_property(GLOBAL PROPERTY OBS_PLUGIN_INSTALL_PREFIX "")
   install(
     TARGETS ${CMAKE_PROJECT_NAME}
     RUNTIME DESTINATION "obs-plugins/64bit" COMPONENT Runtime
@@ -58,4 +56,6 @@ if(WIN32)
     DESTINATION "data/obs-plugins/${_name}"
     COMPONENT Runtime
   )
+  # Usuwa nadmiarowy katalog wygenerowany przez makro szablonu OBS
+  install(CODE "file(REMOVE_RECURSE \"\${CMAKE_INSTALL_PREFIX}/${_name}\")" COMPONENT Runtime)
 endif()
