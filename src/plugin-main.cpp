@@ -85,7 +85,7 @@ public:
 		layout->addWidget(modeLabel);
 		layout->addWidget(timeLabel);
 
-		applyVisualStyle("#00E676", 100);
+		applyVisualStyle("#00E676", 26, 100);
 		applyCaptureExclusion();
 		hide();
 	}
@@ -100,7 +100,8 @@ public:
 #endif
 	}
 
-	void updateDisplay(int remainingSec, CountdownMode mode, int scalePercent, int screenIndex, int cornerIndex)
+	void updateDisplay(int remainingSec, CountdownMode mode, int fontSizePt, int scalePercent,
+			   int screenIndex, int cornerIndex)
 	{
 		int mins = std::max(0, remainingSec) / 60;
 		int secs = std::max(0, remainingSec) % 60;
@@ -123,7 +124,7 @@ public:
 			accentColor = "#FFEA00";
 		}
 
-		applyVisualStyle(accentColor, scalePercent);
+		applyVisualStyle(accentColor, fontSizePt, scalePercent);
 		adjustSize();
 		repositionToScreenAndCorner(screenIndex, cornerIndex);
 		applyCaptureExclusion();
@@ -140,11 +141,18 @@ private:
 	QLabel *modeLabel = nullptr;
 	QLabel *timeLabel = nullptr;
 
-	void applyVisualStyle(const QString &hexColor, int scalePercent)
+	void applyVisualStyle(const QString &hexColor, int fontSizePt, int scalePercent)
 	{
 		double factor = std::clamp(scalePercent, 60, 200) / 100.0;
-		int titlePt = std::max(8, (int)(10 * factor));
-		int timePt = std::max(14, (int)(26 * factor));
+		int baseTimePt = std::clamp(fontSizePt, 12, 96);
+		int timePt = std::max(10, (int)(baseTimePt * factor));
+		int titlePt = std::max(8, (int)(timePt * 0.38));
+
+		int padH = std::max(10, (int)(16 * factor));
+		int padV = std::max(6, (int)(10 * factor));
+		if (layout()) {
+			layout()->setContentsMargins(padH, padV, padH, padV);
+		}
 
 		setStyleSheet(QString(
 			"QWidget {"
@@ -307,6 +315,7 @@ private:
 	QSpinBox *offsetSpin = nullptr;
 	QComboBox *screenCombo = nullptr;
 	QComboBox *cornerCombo = nullptr;
+	QSpinBox *fontSizeSpin = nullptr;
 	QSpinBox *scaleSpin = nullptr;
 
 	void buildDockUi()
@@ -341,6 +350,15 @@ private:
 		cornerCombo->setCurrentIndex(1);
 		cornerRow->addWidget(cornerCombo);
 		root->addLayout(cornerRow);
+
+		auto *fontRow = new QHBoxLayout();
+		fontRow->addWidget(new QLabel(trObs("FontSizeLabel"), this));
+		fontSizeSpin = new QSpinBox(this);
+		fontSizeSpin->setRange(12, 96);
+		fontSizeSpin->setSingleStep(2);
+		fontSizeSpin->setValue(26);
+		fontRow->addWidget(fontSizeSpin);
+		root->addLayout(fontRow);
 
 		auto *scaleRow = new QHBoxLayout();
 		scaleRow->addWidget(new QLabel(trObs("ScaleLabel"), this));
@@ -387,6 +405,11 @@ private:
 			refreshLiveOverlay();
 		});
 
+		connect(fontSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() {
+			saveSettings();
+			refreshLiveOverlay();
+		});
+
 		connect(scaleSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() {
 			saveSettings();
 			refreshLiveOverlay();
@@ -417,15 +440,17 @@ private:
 	void refreshLiveOverlay()
 	{
 		if (overlay && overlay->isVisible()) {
-			overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
-					       screenCombo->currentIndex(), cornerCombo->currentIndex());
+			overlay->updateDisplay(remainingSeconds, activeMode, fontSizeSpin->value(),
+					       scaleSpin->value(), screenCombo->currentIndex(),
+					       cornerCombo->currentIndex());
 		}
 	}
 
 	void startOverlayTimer()
 	{
-		overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
-				       screenCombo->currentIndex(), cornerCombo->currentIndex());
+		overlay->updateDisplay(remainingSeconds, activeMode, fontSizeSpin->value(),
+				       scaleSpin->value(), screenCombo->currentIndex(),
+				       cornerCombo->currentIndex());
 		overlay->show();
 		timer->start();
 	}
@@ -448,8 +473,9 @@ private:
 			return;
 		}
 
-		overlay->updateDisplay(remainingSeconds, activeMode, scaleSpin->value(),
-				       screenCombo->currentIndex(), cornerCombo->currentIndex());
+		overlay->updateDisplay(remainingSeconds, activeMode, fontSizeSpin->value(),
+				       scaleSpin->value(), screenCombo->currentIndex(),
+				       cornerCombo->currentIndex());
 	}
 
 	void saveSettings()
@@ -460,6 +486,7 @@ private:
 		config_set_int(appCfg, "ReplayCountdown", "OffsetSec", offsetSpin->value());
 		config_set_int(appCfg, "ReplayCountdown", "ScreenIndex", screenCombo->currentIndex());
 		config_set_int(appCfg, "ReplayCountdown", "CornerIndex", cornerCombo->currentIndex());
+		config_set_int(appCfg, "ReplayCountdown", "FontSizePt", fontSizeSpin->value());
 		config_set_int(appCfg, "ReplayCountdown", "ScalePercent", scaleSpin->value());
 		config_save_safe(appCfg, "tmp", nullptr);
 	}
@@ -478,6 +505,8 @@ private:
 		}
 		if (config_has_user_value(appCfg, "ReplayCountdown", "CornerIndex"))
 			cornerCombo->setCurrentIndex((int)config_get_int(appCfg, "ReplayCountdown", "CornerIndex"));
+		if (config_has_user_value(appCfg, "ReplayCountdown", "FontSizePt"))
+			fontSizeSpin->setValue((int)config_get_int(appCfg, "ReplayCountdown", "FontSizePt"));
 		if (config_has_user_value(appCfg, "ReplayCountdown", "ScalePercent"))
 			scaleSpin->setValue((int)config_get_int(appCfg, "ReplayCountdown", "ScalePercent"));
 	}

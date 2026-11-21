@@ -45,28 +45,53 @@ function Package {
 
     $BuildSpec = Get-Content -Path ${BuildSpecFile} -Raw | ConvertFrom-Json
     $ProductName = $BuildSpec.name
+    $DisplayName = if ($BuildSpec.displayName) { $BuildSpec.displayName } else { $ProductName }
     $ProductVersion = $BuildSpec.version
 
     $OutputName = "${ProductName}-${ProductVersion}-windows-${Target}"
+    $InstallerName = "${OutputName}-Installer"
+    $ReleaseStageDir = "${ProjectRoot}/release/${Configuration}"
+    $ReleaseOutDir = "${ProjectRoot}/release"
 
     $RemoveArgs = @{
         ErrorAction = 'SilentlyContinue'
         Path = @(
-            "${ProjectRoot}/release/${ProductName}-*-windows-*.zip"
+            "${ReleaseOutDir}/${ProductName}-*-windows-*.zip",
+            "${ReleaseOutDir}/${ProductName}-*-windows-*.exe"
         )
     }
 
     Remove-Item @RemoveArgs
 
-    Log-Group "Archiving ${ProductName}..."
+    Log-Group "Archiving ${ProductName} ZIP..."
     $CompressArgs = @{
-        Path = (Get-ChildItem -Path "${ProjectRoot}/release/${Configuration}" -Exclude "${OutputName}*.*")
+        Path = (Get-ChildItem -Path "${ReleaseStageDir}" -Exclude "${OutputName}*.*")
         CompressionLevel = 'Optimal'
-        DestinationPath = "${ProjectRoot}/release/${OutputName}.zip"
+        DestinationPath = "${ReleaseOutDir}/${OutputName}.zip"
         Verbose = ($Env:CI -ne $null)
     }
     Compress-Archive -Force @CompressArgs
     Log-Group
+
+    $IssScript = "${ProjectRoot}/installer/installer.iss"
+    $IsccExe = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+
+    if ((Test-Path $IssScript) -and (Test-Path $IsccExe)) {
+        Log-Group "Building Windows Installer (${InstallerName}.exe)..."
+        & $IsccExe `
+            "/DMyAppName=${DisplayName}" `
+            "/DMyAppVersion=${ProductVersion}" `
+            "/DMySourceDir=${ReleaseStageDir}" `
+            "/DMyOutputDir=${ReleaseOutDir}" `
+            "/DMyOutputBaseFilename=${InstallerName}" `
+            "${IssScript}"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compiler failed with exit code ${LASTEXITCODE}"
+        }
+        Log-Group
+    } else {
+        Write-Warning "Inno Setup or installer.iss not found, skipping .exe installer creation."
+    }
 }
 
 Package
