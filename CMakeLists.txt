@@ -43,13 +43,9 @@ endif()
 
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/plugin-main.cpp)
 
-set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
-
-# Wymuszenie klasycznej struktury folderow obs-plugins/64bit/ przy pakowaniu na Windows
 if(WIN32)
-  install(
-    TARGETS ${CMAKE_PROJECT_NAME}
-    RUNTIME DESTINATION "obs-plugins/64bit"
-    LIBRARY DESTINATION "obs-plugins/64bit"
-  )
+  set(OBS_PLUGIN_DESTINATION "obs-plugins/64bit")
+  set(OBS_DATA_DESTINATION "data/obs-plugins/${_name}")
 endif()
+
+set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
