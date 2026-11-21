@@ -74,24 +74,32 @@ function Package {
     Log-Group
 
     $IssScript = "${ProjectRoot}/installer/installer.iss"
-    $IsccExe = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-
-    if ((Test-Path $IssScript) -and (Test-Path $IsccExe)) {
-        Log-Group "Building Windows Installer (${InstallerName}.exe)..."
-        & $IsccExe `
-            "/DMyAppName=${DisplayName}" `
-            "/DMyAppVersion=${ProductVersion}" `
-            "/DMySourceDir=${ReleaseStageDir}" `
-            "/DMyOutputDir=${ReleaseOutDir}" `
-            "/DMyOutputBaseFilename=${InstallerName}" `
-            "${IssScript}"
-        if ($LASTEXITCODE -ne 0) {
-            throw "Inno Setup compiler failed with exit code ${LASTEXITCODE}"
-        }
-        Log-Group
-    } else {
-        Write-Warning "Inno Setup or installer.iss not found, skipping .exe installer creation."
+    if (-not (Test-Path $IssScript)) {
+        throw "Brak pliku installer/installer.iss w repozytorium!"
     }
+
+    $IsccCmd = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
+    $IsccExe = if ($IsccCmd) { $IsccCmd.Source } else { "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+
+    if (-not (Test-Path $IsccExe)) {
+        Log-Group "Installing Inno Setup..."
+        choco install innosetup -y --no-progress
+        $IsccExe = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+        Log-Group
+    }
+
+    Log-Group "Building Windows Installer (${InstallerName}.exe)..."
+    & $IsccExe `
+        "/DMyAppName=${DisplayName}" `
+        "/DMyAppVersion=${ProductVersion}" `
+        "/DMySourceDir=${ReleaseStageDir}" `
+        "/DMyOutputDir=${ReleaseOutDir}" `
+        "/DMyOutputBaseFilename=${InstallerName}" `
+        "${IssScript}"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Inno Setup compiler failed with exit code ${LASTEXITCODE}"
+    }
+    Log-Group
 }
 
 Package
