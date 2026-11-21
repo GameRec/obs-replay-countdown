@@ -15,6 +15,7 @@
 #endif
 
 #include <QComboBox>
+#include <QDesktopServices>
 #include <QDockWidget>
 #include <QFrame>
 #include <QGuiApplication>
@@ -25,6 +26,7 @@
 #include <QScreen>
 #include <QSpinBox>
 #include <QTimer>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -381,6 +383,15 @@ private:
 		root->addWidget(statusLabel);
 
 		root->addStretch();
+
+		auto *supportLabel = new QLabel(
+			"<a href=\"https://ko-fi.com/gamerec\" style=\"color:#29B6F6; text-decoration:none;\">"
+			"&#9749; Support GameRec on Ko-fi</a>",
+			this);
+		supportLabel->setAlignment(Qt::AlignRight);
+		supportLabel->setOpenExternalLinks(true);
+		supportLabel->setStyleSheet("font-size: 8.5pt; padding-top: 2px;");
+		root->addWidget(supportLabel);
 
 		connect(testBtn, &QPushButton::clicked, this, [this]() {
 			activeMode = CountdownMode::None;

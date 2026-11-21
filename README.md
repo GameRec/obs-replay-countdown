@@ -1,59 +1,56 @@
-# OBS Plugin Template
+# Replay Countdown for OBS Studio
 
-## Introduction
+[![Ko-fi](https://img.shields.io/badge/Support%20on-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/gamerec)
 
-The plugin template is meant to be used as a starting point for OBS Studio plugin development. It includes:
+Lightweight OBS Studio plugin that displays an on-screen, capture-excluded countdown timer for the **Replay Buffer** and automates back-to-back clip chaining without losing footage.
 
-* Boilerplate plugin source code
-* A CMake project file
-* GitHub Actions workflows and repository actions
+Built for gameplay creators by **[GameRec](https://gamerec.org)**.
 
-## Supported Build Environments
+---
 
-| Platform  | Tool   |
-|-----------|--------|
-| Windows   | Visual Studio 17 2022 |
-| macOS     | XCode 16.0 |
-| Windows, macOS  | CMake 3.30.5 |
-| Ubuntu 24.04 | CMake 3.28.3 |
-| Ubuntu 24.04 | `ninja-build` |
-| Ubuntu 24.04 | `pkg-config`
-| Ubuntu 24.04 | `build-essential` |
+## Key Features
 
-## Quick Start
+ **Auto-Chain Save (`Save + Countdown`)**: Immediately saves the current replay buffer, starts a countdown synced to your OBS Replay Buffer duration (minus a configurable safety offset), and automatically triggers a second save before old footage is overwritten.
+ **Action Window (`Countdown Only`)**: Starts a visual countdown showing how much buffer time remains to save the beginning of an ongoing event. Automatically clears the overlay once you save the replay.
+ **100% Hidden from Capture**: Uses Windows `WDA_EXCLUDEFROMCAPTURE` — visible on your screen, completely invisible in OBS recordings, streams, Display Capture, Discord, and screenshots.
+ **Multi-Monitor & Custom Styling**: Choose target display, screen corner, font size (`pt`), and overall UI scale (`%`).
+ **Native Localization**: Automatically adapts to English (`en-US`) and Polish (`pl-PL`) OBS Studio locales.
 
-An absolute bare-bones [Quick Start Guide](https://github.com/obsproject/obs-plugintemplate/wiki/Quick-Start-Guide) is available in the wiki.
+---
 
-## Documentation
+## Installation (Windows x64)
 
-All documentation can be found in the [Plugin Template Wiki](https://github.com/obsproject/obs-plugintemplate/wiki).
+### Option A: Automated Installer (Recommended)
+1. Download `obs-replay-countdown-1.0.0-windows-x64-Installer.exe` from the **[Releases](../../releases)** page.
+2. Run the installer (it automatically detects your OBS Studio directory).
+3. Restart OBS Studio.
 
-Suggested reading to get up and running:
+### Option B: Portable ZIP
+1. Download `obs-replay-countdown-1.0.0-windows-x64.zip` from **[Releases](../../releases)**.
+2. Extract and copy the `obs-plugins` and `data` folders directly into your OBS Studio installation directory (default: `C:\Program Files\obs-studio\`).
+3. Restart OBS Studio.
 
-* [Getting started](https://github.com/obsproject/obs-plugintemplate/wiki/Getting-Started)
-* [Build system requirements](https://github.com/obsproject/obs-plugintemplate/wiki/Build-System-Requirements)
-* [Build system options](https://github.com/obsproject/obs-plugintemplate/wiki/CMake-Build-System-Options)
+---
 
-## GitHub Actions & CI
+## Usage
 
-Default GitHub Actions workflows are available for the following repository actions:
+1. In OBS Studio, open **Docks → Replay Countdown** (*Panele → Replay Countdown*).
+2. Adjust your **Auto-Chain safety offset**, target **Display monitor**, **Overlay position**, and **Font size**.
+3. Go to **Settings → Hotkeys**, search for `Replay Countdown`, and bind keys to:
+   - `Replay Countdown: Auto-Chain Save (Save + Countdown)`
+   - `Replay Countdown: Action Window (Countdown Only)`
+4. Start the **Replay Buffer** in OBS and use your hotkeys in-game.
 
-* `push`: Run for commits or tags pushed to `master` or `main` branches.
-* `pr-pull`: Run when a Pull Request has been pushed or synchronized.
-* `dispatch`: Run when triggered by the workflow dispatch in GitHub's user interface.
-* `build-project`: Builds the actual project and is triggered by other workflows.
-* `check-format`: Checks CMake and plugin source code formatting and is triggered by other workflows.
+---
 
-The workflows make use of GitHub repository actions (contained in `.github/actions`) and build scripts (contained in `.github/scripts`) which are not needed for local development, but might need to be adjusted if additional/different steps are required to build the plugin.
+## Support the Project
 
-### Retrieving build artifacts
+If this plugin saves your clips and makes your workflow easier, consider buying me a coffee — it directly supports building more free tools for creators:
 
-Successful builds on GitHub Actions will produce build artifacts that can be downloaded for testing. These artifacts are commonly simple archives and will not contain package installers or installation programs.
+👉 **[Support GameRec on Ko-fi](https://ko-fi.com/gamerec)**
 
-### Building a Release
+---
 
-To create a release, an appropriately named tag needs to be pushed to the `main`/`master` branch using semantic versioning (e.g., `12.3.4`, `23.4.5-beta2`). A draft release will be created on the associated repository with generated installer packages or installation programs attached as release artifacts.
+## License
 
-## Signing and Notarizing on macOS
-
-Basic concepts of codesigning and notarization on macOS are explained in the correspodning [Wiki article](https://github.com/obsproject/obs-plugintemplate/wiki/Codesigning-On-macOS) which has a specific section for the [GitHub Actions setup](https://github.com/obsproject/obs-plugintemplate/wiki/Codesigning-On-macOS#setting-up-code-signing-for-github-actions).
+GPL-2.0 — see [LICENSE](LICENSE) for details.
