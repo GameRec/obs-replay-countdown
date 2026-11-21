@@ -43,9 +43,19 @@ endif()
 
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/plugin-main.cpp)
 
-if(WIN32)
-  set(OBS_PLUGIN_DESTINATION "obs-plugins/64bit")
-  set(OBS_DATA_DESTINATION "data/obs-plugins/${_name}")
-endif()
-
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
+
+# Nadpisanie struktury paczki dla Windows: obs-plugins/64bit oraz data/obs-plugins/<nazwa>
+if(WIN32)
+  set_property(GLOBAL PROPERTY OBS_PLUGIN_INSTALL_PREFIX "")
+  install(
+    TARGETS ${CMAKE_PROJECT_NAME}
+    RUNTIME DESTINATION "obs-plugins/64bit" COMPONENT Runtime
+    LIBRARY DESTINATION "obs-plugins/64bit" COMPONENT Runtime
+  )
+  install(
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/data/"
+    DESTINATION "data/obs-plugins/${_name}"
+    COMPONENT Runtime
+  )
+endif()
